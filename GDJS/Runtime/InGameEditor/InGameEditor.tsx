@@ -674,7 +674,7 @@ namespace gdjs {
         scaleZ: float;
       }
     ) {
-      if (Date.now() - this.startTime < 200) {
+      if (Date.now() - this.startTime < 150) {
         // Avoid miss-clicks gizmo dragging point to change object positions.
         return;
       }
