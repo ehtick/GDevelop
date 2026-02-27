@@ -65,7 +65,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -78,6 +78,8 @@ describe('applyEventsChanges', () => {
     expect(sceneEventsList.getEventAt(1).getType()).toBe(
       'BuiltinCommonInstructions::Standard'
     );
+    expect(result.applied).toBe(1);
+    expect(result.errors).toEqual([]);
   });
 
   it('should delete a sub-event', () => {
@@ -109,7 +111,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -124,6 +126,8 @@ describe('applyEventsChanges', () => {
         .getEventAt(0)
         .getType()
     ).toBe('BuiltinCommonInstructions::Comment');
+    expect(result.applied).toBe(1);
+    expect(result.errors).toEqual([]);
   });
 
   it('should delete an event by aiGeneratedEventId', () => {
@@ -198,13 +202,15 @@ describe('applyEventsChanges', () => {
         missingObjectBehaviors: {},
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
       fakeGeneratedEventId
     );
 
+    expect(result.applied).toBe(2);
+    expect(result.errors).toEqual([]);
     expect(serializeToJSObject(sceneEventsList)).toMatchInlineSnapshot(`
       Array [
         Object {
@@ -277,7 +283,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -291,6 +297,8 @@ describe('applyEventsChanges', () => {
       'BuiltinCommonInstructions::Standard',
       'BuiltinCommonInstructions::Repeat',
     ]);
+    expect(result.applied).toBe(1);
+    expect(result.errors).toEqual([]);
   });
 
   it('should append events if path targets end of list', () => {
@@ -313,7 +321,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -327,6 +335,8 @@ describe('applyEventsChanges', () => {
       'BuiltinCommonInstructions::Standard',
       'BuiltinCommonInstructions::Standard',
     ]);
+    expect(result.applied).toBe(1);
+    expect(result.errors).toEqual([]);
   });
 
   it('should insert events as sub-events', () => {
@@ -350,7 +360,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -362,6 +372,8 @@ describe('applyEventsChanges', () => {
       'BuiltinCommonInstructions::Standard',
       'BuiltinCommonInstructions::Standard',
     ]);
+    expect(result.applied).toBe(1);
+    expect(result.errors).toEqual([]);
   });
 
   it('should replace an event', () => {
@@ -386,7 +398,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -400,6 +412,8 @@ describe('applyEventsChanges', () => {
       'BuiltinCommonInstructions::Standard',
       'BuiltinCommonInstructions::While',
     ]);
+    expect(result.applied).toBe(2);
+    expect(result.errors).toEqual([]);
   });
 
   it('should process deletions before insertions when paths are sorted', () => {
@@ -439,7 +453,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -456,13 +470,12 @@ describe('applyEventsChanges', () => {
       'BuiltinCommonInstructions::Repeat', // R1
       'BuiltinCommonInstructions::ForEach', // F3
     ]);
+    expect(result.applied).toBe(2);
+    expect(result.errors).toEqual([]);
   });
 
-  it('should warn and skip insert if no generatedEvents provided for an insert operation', () => {
+  it('should return error and skip insert if no generatedEvents provided for an insert operation', () => {
     setupInitialSceneEvents(['BuiltinCommonInstructions::Standard']);
-    const consoleWarnSpy = jest
-      .spyOn(console, 'warn')
-      .mockImplementation(() => {});
 
     const eventOperations: Array<AiGeneratedEventChange> = [
       {
@@ -480,7 +493,7 @@ describe('applyEventsChanges', () => {
       },
     ];
 
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -488,19 +501,18 @@ describe('applyEventsChanges', () => {
     );
 
     expect(sceneEventsList.getEventsCount()).toBe(1); // No events added
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'Insert operation for path [1] skipped: no events to insert or events list is empty'
-      )
+    expect(result.applied).toBe(0);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(
+          'Insert operation for path [1] skipped: no events to insert or events list is empty'
+        ),
+      ])
     );
-    consoleWarnSpy.mockRestore();
   });
 
-  it('should skip invalid delete path (out of bounds) gracefully and log error', () => {
+  it('should skip invalid delete path (out of bounds) gracefully and return error', () => {
     setupInitialSceneEvents(['BuiltinCommonInstructions::Standard']);
-    const consoleErrorSpy = jest
-      .spyOn(console, 'error')
-      .mockImplementation(() => {});
     const eventOperations: Array<AiGeneratedEventChange> = [
       {
         operationName: 'delete_event',
@@ -516,20 +528,21 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
       fakeGeneratedEventId
     );
     expect(sceneEventsList.getEventsCount()).toBe(1); // No change
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining(
-        'Error applying event operation type delete for path [5]'
-      ),
-      expect.any(Error)
+    expect(result.applied).toBe(0);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(
+          'Error applying event operation type delete for path [5]'
+        ),
+      ])
     );
-    consoleErrorSpy.mockRestore();
   });
 
   it('should replace event using replace_entire_event_and_sub_events (synonym for insert_and_replace_event)', () => {
@@ -553,7 +566,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -567,6 +580,8 @@ describe('applyEventsChanges', () => {
       'BuiltinCommonInstructions::Standard',
       'BuiltinCommonInstructions::While',
     ]);
+    expect(result.applied).toBe(2);
+    expect(result.errors).toEqual([]);
   });
 
   it('should replace event but keep existing sub-events with replace_event_but_keep_existing_sub_events', () => {
@@ -601,7 +616,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -625,6 +640,8 @@ describe('applyEventsChanges', () => {
         .getEventAt(1)
         .getType()
     ).toBe('BuiltinCommonInstructions::Standard');
+    expect(result.applied).toBe(1);
+    expect(result.errors).toEqual([]);
   });
 
   it('should append sub-events from replacement event with replace_event_but_keep_existing_sub_events', () => {
@@ -657,7 +674,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -680,6 +697,8 @@ describe('applyEventsChanges', () => {
         .getEventAt(1)
         .getType()
     ).toBe('BuiltinCommonInstructions::Repeat'); // From replacement
+    expect(result.applied).toBe(1);
+    expect(result.errors).toEqual([]);
   });
 
   it('should insert events after target with insert_after_event', () => {
@@ -703,7 +722,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -718,6 +737,8 @@ describe('applyEventsChanges', () => {
       'BuiltinCommonInstructions::Repeat',
       'BuiltinCommonInstructions::While',
     ]);
+    expect(result.applied).toBe(1);
+    expect(result.errors).toEqual([]);
   });
 
   it('should insert events after last event with insert_after_event', () => {
@@ -740,7 +761,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -754,6 +775,8 @@ describe('applyEventsChanges', () => {
       'BuiltinCommonInstructions::Standard',
       'BuiltinCommonInstructions::Standard',
     ]);
+    expect(result.applied).toBe(1);
+    expect(result.errors).toEqual([]);
   });
 
   it('should copy actions and conditions at end with insert_actions_conditions_at_end', () => {
@@ -792,7 +815,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -802,6 +825,8 @@ describe('applyEventsChanges', () => {
     const resultEvent = gd.asStandardEvent(sceneEventsList.getEventAt(0));
     // Check actions: existing first, new at end
     expect(resultEvent.getActions().size()).toBe(2);
+    expect(result.applied).toBe(1);
+    expect(result.errors).toEqual([]);
     expect(
       resultEvent
         .getActions()
@@ -861,7 +886,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -882,6 +907,8 @@ describe('applyEventsChanges', () => {
         .get(1)
         .getType()
     ).toBe('NewWhileCondition');
+    expect(result.applied).toBe(1);
+    expect(result.errors).toEqual([]);
   });
 
   it('should copy actions and conditions at start with insert_actions_conditions_at_start', () => {
@@ -920,7 +947,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -930,6 +957,8 @@ describe('applyEventsChanges', () => {
     const resultEvent = gd.asStandardEvent(sceneEventsList.getEventAt(0));
     // Check actions: new first, existing at end
     expect(resultEvent.getActions().size()).toBe(2);
+    expect(result.applied).toBe(1);
+    expect(result.errors).toEqual([]);
     expect(
       resultEvent
         .getActions()
@@ -993,7 +1022,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -1003,6 +1032,8 @@ describe('applyEventsChanges', () => {
     const resultEvent = gd.asStandardEvent(sceneEventsList.getEventAt(0));
     // Only the replacement action should remain
     expect(resultEvent.getActions().size()).toBe(1);
+    expect(result.applied).toBe(1);
+    expect(result.errors).toEqual([]);
     expect(
       resultEvent
         .getActions()
@@ -1046,7 +1077,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -1056,6 +1087,8 @@ describe('applyEventsChanges', () => {
     const resultEvent = gd.asStandardEvent(sceneEventsList.getEventAt(0));
     // Only the replacement condition should remain
     expect(resultEvent.getConditions().size()).toBe(1);
+    expect(result.applied).toBe(1);
+    expect(result.errors).toEqual([]);
     expect(
       resultEvent
         .getConditions()
@@ -1095,7 +1128,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -1110,6 +1143,8 @@ describe('applyEventsChanges', () => {
         .get(0)
         .getType()
     ).toBe('ReplacementWhileCondition');
+    expect(result.applied).toBe(1);
+    expect(result.errors).toEqual([]);
   });
 
   it('should target event by aiGeneratedEventId instead of path', () => {
@@ -1143,7 +1178,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -1156,6 +1191,8 @@ describe('applyEventsChanges', () => {
       'BuiltinCommonInstructions::Comment',
       'BuiltinCommonInstructions::Repeat',
     ]);
+    expect(result.applied).toBe(2);
+    expect(result.errors).toEqual([]);
   });
 
   it('should find nested event by aiGeneratedEventId', () => {
@@ -1191,7 +1228,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -1207,13 +1244,12 @@ describe('applyEventsChanges', () => {
         .getEventAt(0)
         .getType()
     ).toBe('BuiltinCommonInstructions::Comment');
+    expect(result.applied).toBe(1);
+    expect(result.errors).toEqual([]);
   });
 
-  it('should skip operation if event with aiGeneratedEventId is not found', () => {
+  it('should skip operation if event with aiGeneratedEventId is not found and return error', () => {
     setupInitialSceneEvents(['BuiltinCommonInstructions::Standard']);
-    const consoleWarnSpy = jest
-      .spyOn(console, 'warn')
-      .mockImplementation(() => {});
 
     const eventOperations: Array<AiGeneratedEventChange> = [
       {
@@ -1230,7 +1266,7 @@ describe('applyEventsChanges', () => {
         missingResources: [],
       },
     ];
-    applyEventsChanges(
+    const result = applyEventsChanges(
       project,
       sceneEventsList,
       eventOperations,
@@ -1238,10 +1274,12 @@ describe('applyEventsChanges', () => {
     );
 
     expect(sceneEventsList.getEventsCount()).toBe(1); // No change
-    expect(consoleWarnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Could not find event with aiGeneratedEventId')
+    expect(result.applied).toBe(0);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('Could not find event with aiGeneratedEventId'),
+      ])
     );
-    consoleWarnSpy.mockRestore();
   });
 });
 
