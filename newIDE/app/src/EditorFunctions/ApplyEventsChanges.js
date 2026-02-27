@@ -272,6 +272,40 @@ export const applyEventsChanges = (
     let localEventsToInsert: gdEventsList | null = null;
 
     try {
+      // Check for comma-separated targets
+      if (operationTargetEvent && operationTargetEvent.includes(',')) {
+        if (operationName !== 'delete_event') {
+          errors.push(
+            `Operation "${operationName}" does not support multiple comma separated events as target.`
+          );
+          return;
+        }
+
+        // Handle comma-separated delete targets
+        const targets = operationTargetEvent
+          .split(',')
+          .map(t => t.trim())
+          .filter(t => t.length > 0);
+        for (const target of targets) {
+          let targetPath = findEventPathByAiGeneratedEventId(
+            sceneEvents,
+            target
+          );
+          if (!targetPath) {
+            try {
+              targetPath = parseEventPath(target);
+            } catch (pathParseError) {
+              errors.push(
+                `Could not find event with aiGeneratedEventId "${target}" and could not parse as path. Skipping deletion of "${target}".`
+              );
+              continue;
+            }
+          }
+          operations.push({ type: 'delete', path: targetPath });
+        }
+        return;
+      }
+
       if (operationTargetEvent) {
         // First search for an event with the exact aiGeneratedEventId.
         parsedPath = findEventPathByAiGeneratedEventId(
